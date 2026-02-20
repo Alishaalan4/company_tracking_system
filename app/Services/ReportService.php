@@ -13,7 +13,7 @@ class ReportService
     {
         $date = Carbon::parse($date);
 
-        $query = Attendance::whereDate('date', $date);
+        $query = Attendance::whereDate($date);
 
         if ($user->isManager()) {
             $query->whereHas('user', function ($q) use ($user) {
