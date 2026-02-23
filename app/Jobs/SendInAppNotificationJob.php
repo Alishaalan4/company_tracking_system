@@ -13,7 +13,7 @@ class SendInAppNotificationJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
- protected $userId;
+    protected $userId;
     protected $title;
     protected $body;
 
