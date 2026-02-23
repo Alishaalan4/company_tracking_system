@@ -2,6 +2,19 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AttendanceController;
+use App\Http\Controllers\LeaveController;
+use App\Http\Controllers\ReportController;
+use App\Http\Controllers\DepartmentController;
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\LeaveTypeController;
+use App\Http\Controllers\NonWorkingDayController;
+use App\Http\Controllers\SettingController;
+use App\Http\Controllers\AuditController;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ForgotPasswordController;
+use App\Http\Controllers\ResetPasswordController;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -18,13 +31,41 @@ use Illuminate\Support\Facades\Route;
 // - throttle:attendance → Prevents abuse of the attendance check endpoint (rate limiting).
 // - attendance.guard → Stops users from checking in/out multiple times in one day (your AttendanceGuardMiddleware).
 
+Route::prefix('auth')->group(function () {
 
-Route::post('/login', [AuthController::class, 'login']);
-Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
+    // Login (email + password OR PIN depending on your system)
+    Route::post('/login', [AuthController::class, 'login'])
+        ->middleware('throttle:5,1'); // 5 attempts per minute
 
+    // Forgot password
+    Route::post('/forgot-password',
+        [ForgotPasswordController::class, 'sendResetLink']
+    )->middleware('throttle:3,1');
 
+    // Reset password
+    Route::post('/reset-password',
+        [ResetPasswordController::class, 'reset']);
 
-Route::middleware(['auth:sanctum'])->group(function () {
+});
+
+Route::middleware(['auth:sanctum'])->prefix('auth')->group(function () {
+
+    // Logout
+    Route::post('/logout', [AuthController::class, 'logout']);
+
+    // Current logged-in user
+    Route::get('/me', function (Request $request) {
+        return $request->user()->load('role', 'department');
+    });
+
+    // Change password
+    Route::post('/change-password',
+        [AuthController::class, 'changePassword']);
+
+    // Change PIN (for attendance system)
+    Route::post('/change-pin',
+        [AuthController::class, 'changePin']);
+});
 
     /*
     |--------------------------------------------------------------------------
@@ -32,37 +73,26 @@ Route::middleware(['auth:sanctum'])->group(function () {
     |--------------------------------------------------------------------------
     */
 
-    Route::prefix('attendance')->group(function () {
+    Route::prefix('attendance')->middleware('role:employee,manager,admin')->group(function () {
 
         Route::post('/check', 
             [AttendanceController::class, 'check']
-        )->middleware([
-            'role:employee,manager,admin',
-            'throttle:attendance',
-            'attendance.guard'
-        ]);
+        )->middleware(['throttle:attendance','attendance.guard']);
 
         Route::get('/history',
-            [AttendanceController::class, 'history']
-        )->middleware('role:employee,manager,admin');
-
+            [AttendanceController::class, 'history']);
     });
 
     /*
     |--------------------------------------------------------------------------
-    | LEAVE REQUESTS
+    | LEAVES
     |--------------------------------------------------------------------------
     */
 
-    Route::prefix('leaves')->group(function () {
+    Route::prefix('leaves')->middleware('role:employee,manager,admin')->group(function () {
 
-        Route::post('/',
-            [LeaveController::class, 'store']
-        )->middleware('role:employee,manager,admin');
-
-        Route::get('/',
-            [LeaveController::class, 'index']
-        );
+        Route::post('/', [LeaveController::class, 'store']);
+        Route::get('/', [LeaveController::class, 'index']);
 
         Route::put('/{leave}',
             [LeaveController::class, 'update']
@@ -75,12 +105,35 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     /*
     |--------------------------------------------------------------------------
+    | NOTIFICATIONS
+    |--------------------------------------------------------------------------
+    */
+
+    Route::prefix('notifications')->group(function () {
+
+        Route::get('/', fn(Request $r) =>
+            $r->user()->notifications()->latest()->get()
+        );
+
+        Route::post('/{id}/read', function ($id, Request $r) {
+            $notification = $r->user()
+                ->notifications()
+                ->findOrFail($id);
+
+            $notification->update(['is_read' => true]);
+
+            return response()->json(['message'=>'Marked as read']);
+        });
+    });
+
+    /*
+    |--------------------------------------------------------------------------
     | REPORTS
     |--------------------------------------------------------------------------
     */
 
     Route::prefix('reports')
-        ->middleware(['role:admin,manager'])
+        ->middleware(['role:admin,manager','department.scope'])
         ->group(function () {
 
         Route::get('/daily', [ReportController::class, 'daily']);
@@ -93,7 +146,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | DEPARTMENTS (ADMIN)
+    | ADMIN ONLY
     |--------------------------------------------------------------------------
     */
 
@@ -105,7 +158,13 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::apiResource('users', UserController::class);
 
         Route::get('/audit-logs', [AuditController::class, 'index']);
-        Route::post('/settings', [SettingController::class, 'update']);
-    });
 
-});
+        Route::get('/settings', fn() => \App\Models\Setting::all());
+        Route::post('/settings', [SettingController::class, 'update']);
+
+        Route::post('/register', [AuthController::class, 'register']);
+
+        Route::middleware(['auth:sanctum','role:admin'])
+    ->post('/users/{user}/resend-credentials',
+        [UserController::class, 'resendCredentials']);
+    }); 
