@@ -15,7 +15,7 @@ class LeaveService
         $overlap = LeaveRequest::where('user_id', $user->id)
             ->where(function ($q) use ($data) {
                 $q->whereBetween('start_date', [$data['start_date'], $data['end_date']])
-                  ->orWhereBetween('end_date', [$data['start_date'], $data['end_date']]);
+                    ->orWhereBetween('end_date', [$data['start_date'], $data['end_date']]);
             })
             ->exists();
 
