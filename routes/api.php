@@ -46,6 +46,13 @@ Route::prefix('auth')->group(function () {
     Route::post('/reset-password',
         [ResetPasswordController::class, 'reset']);
 
+    Route::get('/reset-password/{token}', function ($token) {
+        return view('auth.reset-password', [
+            'token' => $token,
+            'email' => request('email'),
+        ]);
+    })->name('password.reset');
+
 });
 
 Route::middleware(['auth:sanctum'])->prefix('auth')->group(function () {
