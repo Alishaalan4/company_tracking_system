@@ -10,7 +10,7 @@ use App\Models\User;
 
 class AuthController extends Controller
 {
-        public function register(Request $request)
+    public function register(Request $request)
     {
         $request->validate([
             'name'          => 'required|string',
@@ -60,5 +60,47 @@ class AuthController extends Controller
         $request->user()->currentAccessToken()->delete();
 
         return response()->json(['message' => 'Logged out']);
+    }
+
+    public function changePassword(Request $request)
+    {
+        $request->validate([
+            'current_password' => 'required|string',
+            'password' => 'required|string|min:6|confirmed',
+        ]);
+
+        $user = $request->user();
+
+        if (!Hash::check($request->current_password, $user->password)) {
+            return response()->json(['message' => 'Current password is incorrect'], 422);
+        }
+
+        $user->update([
+            'password' => Hash::make($request->password),
+            'must_change_password' => false,
+        ]);
+
+        return response()->json(['message' => 'Password changed successfully']);
+    }
+
+    public function changePin(Request $request)
+    {
+        $request->validate([
+            'current_pin' => 'required|string|min:4|max:6',
+            'pin' => 'required|string|min:4|max:6|confirmed',
+        ]);
+
+        $user = $request->user();
+
+        if (!Hash::check($request->current_pin, $user->pin)) {
+            return response()->json(['message' => 'Current PIN is incorrect'], 422);
+        }
+
+        $user->update([
+            'pin' => Hash::make($request->pin),
+            'must_change_pin' => false,
+        ]);
+
+        return response()->json(['message' => 'PIN changed successfully']);
     }
 }
