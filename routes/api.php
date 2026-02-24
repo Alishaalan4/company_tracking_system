@@ -80,7 +80,7 @@ Route::middleware(['auth:sanctum'])->prefix('auth')->group(function () {
     |--------------------------------------------------------------------------
     */
 
-    Route::prefix('attendance')->middleware('role:employee,manager,admin')->group(function () {
+    Route::prefix('attendance')->middleware(['auth:sanctum','role:employee,manager,admin'])->group(function () {
 
         Route::post('/check', 
             [AttendanceController::class, 'check']
@@ -96,7 +96,7 @@ Route::middleware(['auth:sanctum'])->prefix('auth')->group(function () {
     |--------------------------------------------------------------------------
     */
 
-    Route::prefix('leaves')->middleware('role:employee,manager,admin')->group(function () {
+    Route::prefix('leaves')->middleware(['auth:sanctum','role:employee,manager,admin'])->group(function () {
 
         Route::post('/', [LeaveController::class, 'store']);
         Route::get('/', [LeaveController::class, 'index']);
@@ -116,7 +116,7 @@ Route::middleware(['auth:sanctum'])->prefix('auth')->group(function () {
     |--------------------------------------------------------------------------
     */
 
-    Route::prefix('notifications')->group(function () {
+    Route::prefix('notifications')->middleware('auth:sanctum')->group(function () {
 
         Route::get('/', fn(Request $r) =>
             $r->user()->notifications()->latest()->get()
@@ -140,7 +140,7 @@ Route::middleware(['auth:sanctum'])->prefix('auth')->group(function () {
     */
 
     Route::prefix('reports')
-        ->middleware(['role:admin,manager','department.scope'])
+        ->middleware(['auth:sanctum','role:admin,manager','department.scope'])
         ->group(function () {
 
         Route::get('/daily', [ReportController::class, 'daily']);
@@ -157,7 +157,7 @@ Route::middleware(['auth:sanctum'])->prefix('auth')->group(function () {
     |--------------------------------------------------------------------------
     */
 
-    Route::middleware('role:admin')->group(function () {
+    Route::middleware(['auth:sanctum','role:admin'])->group(function () {
 
         Route::apiResource('departments', DepartmentController::class);
         Route::apiResource('leave-types', LeaveTypeController::class);
@@ -171,7 +171,6 @@ Route::middleware(['auth:sanctum'])->prefix('auth')->group(function () {
 
         Route::post('/register', [AuthController::class, 'register']);
 
-        Route::middleware(['auth:sanctum','role:admin'])
-    ->post('/users/{user}/resend-credentials',
-        [UserController::class, 'resendCredentials']);
+        Route::post('/users/{user}/resend-credentials',
+            [UserController::class, 'resendCredentials']);
     }); 

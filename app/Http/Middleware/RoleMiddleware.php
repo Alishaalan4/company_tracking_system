@@ -21,15 +21,19 @@ class RoleMiddleware
     // - Effect: Once a user has both check-in and check-out recorded for the day, they cannot hit attendance-related endpoints again
     public function handle(Request $request, Closure $next,...$roles): Response
     {
-        $user=$request->user();
-        if(!$user)
+        $user = $request->user();
+        if (!$user) 
         {
-            return response()->json(["msg"=>"Unauthenticated"]);
+            return response()->json(['msg' => 'Unauthenticated'], 401);
         }
-        if (!in_array($user->role->name, $roles))
-        {
-            return response()->json(["msg"=> "Forbidden"]);
+
+        $userRole = strtolower((string) optional($user->role)->name);
+        $allowedRoles = array_map(fn ($role) => strtolower((string) $role), $roles);
+
+        if ($userRole === '' || !in_array($userRole, $allowedRoles, true)) {
+            return response()->json(['msg' => 'Forbidden'], 403);
         }
+
         return $next($request);
     }
 }
