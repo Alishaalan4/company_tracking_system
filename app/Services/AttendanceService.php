@@ -9,14 +9,13 @@ use Carbon\Carbon;
 
 class AttendanceService
 {
-    public function handleCheck($user, $pin)
+    private function validateCheckContext($user, $pin)
     {
         if (!Hash::check($pin, $user->pin)) {
             return response()->json(['message' => 'Invalid PIN'], 422);
         }
 
         $today = Carbon::today();
-        $now   = Carbon::now();
 
         // Skip non-working days
         if (NonWorkingDay::where('date', $today)->exists()) {
@@ -34,49 +33,91 @@ class AttendanceService
             return response()->json(['message' => 'You are on leave today']);
         }
 
-        $attendance = Attendance::firstOrCreate(
+        return null;
+    }
+
+    private function getTodayAttendance($user)
+    {
+        return Attendance::firstOrCreate(
             [
                 'user_id' => $user->id,
-                'date'    => $today
+                'date' => Carbon::today(),
             ]
         );
+    }
 
+    public function checkIn($user, $pin)
+    {
+        $contextError = $this->validateCheckContext($user, $pin);
+        if ($contextError) {
+            return $contextError;
+        }
+
+        $attendance = $this->getTodayAttendance($user);
+
+        if ($attendance->check_in_at) {
+            return response()->json(['message' => 'Already checked in today'], 422);
+        }
+
+        $now = Carbon::now();
         $department = $user->department;
-
         $workStart = Carbon::parse($department->work_start);
-        $workEnd   = Carbon::parse($department->work_end);
+
+        $attendance->check_in_at = $now;
+        $lateLimit = $workStart->copy()->addMinutes($department->late_after);
+
+        if ($now->gt($lateLimit)) {
+            $attendance->is_late = true;
+        }
+
+        $attendance->save();
+
+        return response()->json(['message' => 'Checked in']);
+    }
+
+    public function checkOut($user, $pin)
+    {
+        $contextError = $this->validateCheckContext($user, $pin);
+        if ($contextError) {
+            return $contextError;
+        }
+
+        $attendance = $this->getTodayAttendance($user);
 
         if (!$attendance->check_in_at) {
-
-            $attendance->check_in_at = $now;
-
-            $lateLimit = $workStart->copy()->addMinutes($department->late_after);
-
-            if ($now->gt($lateLimit)) {
-                $attendance->is_late = true;
-            }
-
-            $attendance->save();
-
-            return response()->json(['message' => 'Checked in']);
+            return response()->json(['message' => 'No check-in found for today'], 422);
         }
 
-        if (!$attendance->check_out_at) {
-
-            $attendance->check_out_at = $now;
-
-            $earlyLimit = $workEnd->copy()->subMinutes($department->early_leave_before);
-
-            if ($now->lt($earlyLimit)) {
-                $attendance->left_early = true;
-            }
-
-            $attendance->save();
-
-            return response()->json(['message' => 'Checked out']);
+        if ($attendance->check_out_at) {
+            return response()->json(['message' => 'Already checked out today'], 422);
         }
 
-        return response()->json(['message' => 'Already completed'], 422);
+        $now = Carbon::now();
+        $department = $user->department;
+        $workEnd = Carbon::parse($department->work_end);
+        $attendance->check_out_at = $now;
+        $earlyLimit = $workEnd->copy()->subMinutes($department->early_leave_before);
+
+        if ($now->lt($earlyLimit)) {
+            $attendance->left_early = true;
+        }
+
+        $attendance->save();
+
+        return response()->json(['message' => 'Checked out']);
+    }
+
+    public function handleCheck($user, $pin)
+    {
+        $attendance = Attendance::where('user_id', $user->id)
+            ->whereDate('date', Carbon::today())
+            ->first();
+
+        if (!$attendance || !$attendance->check_in_at) {
+            return $this->checkIn($user, $pin);
+        }
+
+        return $this->checkOut($user, $pin);
     }
 
     public function history($user)

@@ -86,6 +86,14 @@ Route::middleware(['auth:sanctum'])->prefix('auth')->group(function () {
 
     Route::prefix('attendance')->middleware(['auth:sanctum','role:employee,manager,admin'])->group(function () {
 
+        Route::post('/check-in',
+            [AttendanceController::class, 'checkIn']
+        )->middleware('throttle:attendance');
+
+        Route::post('/check-out',
+            [AttendanceController::class, 'checkOut']
+        )->middleware('throttle:attendance');
+
         Route::post('/check', 
             [AttendanceController::class, 'check']
         )->middleware(['throttle:attendance','attendance.guard']);
@@ -101,6 +109,21 @@ Route::middleware(['auth:sanctum'])->prefix('auth')->group(function () {
     */
 
     Route::prefix('leaves')->middleware(['auth:sanctum','role:employee,manager,admin'])->group(function () {
+
+        Route::post('/', [LeaveController::class, 'store']);
+        Route::get('/', [LeaveController::class, 'index']);
+
+        Route::put('/{leave}',
+            [LeaveController::class, 'update']
+        )->middleware('role:admin');
+
+        Route::delete('/{leave}',
+            [LeaveController::class, 'destroy']
+        )->middleware('role:admin');
+    });
+
+    // Backward-compatible alias for clients using /api/leave-requests
+    Route::prefix('leave-requests')->middleware(['auth:sanctum','role:employee,manager,admin'])->group(function () {
 
         Route::post('/', [LeaveController::class, 'store']);
         Route::get('/', [LeaveController::class, 'index']);

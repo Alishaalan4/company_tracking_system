@@ -28,7 +28,7 @@ class LeaveService
             'leave_type_id' => $data['leave_type_id'],
             'start_date' => $data['start_date'],
             'end_date' => $data['end_date'],
-            'reason' => $data['reason'],
+            'reason' => $data['reason'] ?? null,
             'status' => 'pending'
         ]);
 
