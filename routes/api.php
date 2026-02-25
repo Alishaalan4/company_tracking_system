@@ -33,6 +33,10 @@ use App\Http\Controllers\ResetPasswordController;
 
 Route::prefix('auth')->group(function () {
 
+    // Login with email + PIN
+    Route::post('/login/pin', [AuthController::class, 'pinLogin'])
+        ->middleware('throttle:5,1');
+
     // Login (email + password OR PIN depending on your system)
     Route::post('/login', [AuthController::class, 'login'])
         ->middleware('throttle:5,1'); // 5 attempts per minute

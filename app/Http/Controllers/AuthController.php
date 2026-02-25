@@ -37,14 +37,24 @@ class AuthController extends Controller
     {
         $request->validate([
             'email' => 'required|email',
-            'password' => 'required'
+            'password' => 'nullable|string|required_without:pin',
+            'pin' => 'nullable|string|min:4|max:6|required_without:password',
         ]);
 
         $user = User::where('email', $request->email)->first();
 
-        if (!$user || !Hash::check($request->password, $user->password)) 
-        {
-            return response()->json(['message'=> 'Invalid Credentials']);
+        if (!$user) {
+            return response()->json(['message'=> 'Invalid Credentials'], 401);
+        }
+
+        $isPasswordLogin = $request->filled('password');
+        $isPinLogin = $request->filled('pin');
+
+        $isValidCredentials = ($isPasswordLogin && Hash::check($request->password, $user->password))
+            || ($isPinLogin && Hash::check($request->pin, $user->pin));
+
+        if (!$isValidCredentials) {
+            return response()->json(['message'=> 'Invalid Credentials'], 401);
         }
 
         $token = $user->createToken('api-token')->plainTextToken;
@@ -53,6 +63,16 @@ class AuthController extends Controller
             'user' => $user,
             'token' => $token
         ]);
+    }
+
+    public function pinLogin(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email',
+            'pin' => 'required|string|min:4|max:6',
+        ]);
+
+        return $this->login($request);
     }
 
     public function logout(Request $request)
