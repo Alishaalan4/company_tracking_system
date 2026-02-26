@@ -13,10 +13,8 @@ class LeaveService
     {
         // Overlap prevention
         $overlap = LeaveRequest::where('user_id', $user->id)
-            ->where(function ($q) use ($data) {
-                $q->whereBetween('start_date', [$data['start_date'], $data['end_date']])
-                    ->orWhereBetween('end_date', [$data['start_date'], $data['end_date']]);
-            })
+            ->whereDate('start_date', '<=', $data['end_date'])
+            ->whereDate('end_date', '>=', $data['start_date'])
             ->exists();
 
         if ($overlap) {
@@ -37,6 +35,10 @@ class LeaveService
 
     public function updateStatus($id, $status)
     {
+        if (!in_array($status, ['pending', 'approved', 'rejected'], true)) {
+            return response()->json(['message' => 'Invalid status value'], 422);
+        }
+
         $leave = LeaveRequest::findOrFail($id);
         $leave->status = $status;
         $leave->save();

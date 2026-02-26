@@ -35,7 +35,11 @@ class LeaveController extends Controller
 
     public function update($id, Request $request)
     {
-        return $this->leaveService->updateStatus($id, $request->status);
+        $validated = $request->validate([
+            'status' => 'required|in:pending,approved,rejected',
+        ]);
+
+        return $this->leaveService->updateStatus($id, $validated['status']);
     }
 
     public function destroy($id)
