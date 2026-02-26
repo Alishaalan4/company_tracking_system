@@ -57,14 +57,26 @@ class UserController extends Controller
 
     public function update(Request $request, User $user)
     {
-        $data = $request->all();
+        $data = $request->validate([
+            'name' => 'sometimes|required|string|max:255',
+            'email' => 'sometimes|required|email|unique:users,email,' . $user->id,
+            'role_id' => 'sometimes|required|exists:roles,id',
+            'department_id' => 'nullable|exists:departments,id',
+            'password' => 'sometimes|required|string|min:6|confirmed',
+            'pin' => 'sometimes|required|string|min:4|max:6|confirmed',
+            'must_change_password' => 'sometimes|boolean',
+            'must_change_pin' => 'sometimes|boolean',
+            'is_active' => 'sometimes|boolean',
+        ]);
 
-        if ($request->password) {
+        if ($request->filled('password')) {
             $data['password'] = Hash::make($request->password);
+            unset($data['password_confirmation']);
         }
 
-        if ($request->pin) {
+        if ($request->filled('pin')) {
             $data['pin'] = Hash::make($request->pin);
+            unset($data['pin_confirmation']);
         }
 
         $user->update($data);

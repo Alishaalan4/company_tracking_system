@@ -26,6 +26,7 @@ class User extends Authenticatable implements CanResetPasswordContract
         'pin',
         'role_id',
         'department_id',
+        'is_active',
         'must_change_password',
         'must_change_pin',
     ];
@@ -51,6 +52,7 @@ class User extends Authenticatable implements CanResetPasswordContract
         'password' => 'hashed',
         'must_change_password' => 'boolean',
         'must_change_pin' => 'boolean',
+        'is_active' => 'boolean',
     ];
 
     public function role()
