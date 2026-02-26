@@ -68,11 +68,4 @@ class Kernel extends HttpKernel
         'department.scope' => \App\Http\Middleware\DepartmentScopeMiddleware::class,
         'attendance.guard' => \App\Http\Middleware\AttendanceGuardMiddleware::class,
     ];
-
-    protected function schedule(Schedule $schedule)
-    {
-    $schedule->command('attendance:auto-absence')
-        ->dailyAt('23:59');
-    }
-
 }
