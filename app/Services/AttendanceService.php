@@ -53,6 +53,10 @@ class AttendanceService
             return $contextError;
         }
 
+        if (!$user->department) {
+            return response()->json(['message' => 'User is not assigned to a department'], 422);
+        }
+
         $attendance = $this->getTodayAttendance($user);
 
         if ($attendance->check_in_at) {
@@ -82,6 +86,10 @@ class AttendanceService
             return $contextError;
         }
 
+        if (!$user->department) {
+            return response()->json(['message' => 'User is not assigned to a department'], 422);
+        }
+
         $attendance = $this->getTodayAttendance($user);
 
         if (!$attendance->check_in_at) {
@@ -109,8 +117,9 @@ class AttendanceService
 
     public function handleCheck($user, $pin)
     {
+        $date = Carbon::today();
         $attendance = Attendance::where('user_id', $user->id)
-            ->whereDate('date', Carbon::today())
+            ->whereDate($date)
             ->first();
 
         if (!$attendance || !$attendance->check_in_at) {
