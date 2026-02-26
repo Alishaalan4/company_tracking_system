@@ -11,9 +11,9 @@ class ReportService
 {
     public function daily($user, $date)
     {
-        $date = Carbon::parse($date);
+        $date = Carbon::parse($date)->toDateString();
 
-        $query = Attendance::whereDate($date);
+        $query = Attendance::whereDate( $date);
 
         if ($user->isManager()) {
             $query->whereHas('user', function ($q) use ($user) {
@@ -51,22 +51,23 @@ class ReportService
         }
 
         return [
-            'total_late' => $query->where('is_late', true)->count(),
-            'total_absent' => $query->where('is_absent', true)->count(),
-            'total_early' => $query->where('left_early', true)->count(),
+            'total_late' => (clone $query)->where('is_late', true)->count(),
+            'total_absent' => (clone $query)->where('is_absent', true)->count(),
+            'total_early' => (clone $query)->where('left_early', true)->count(),
         ];
     }
 
     public function exportPdf($user)
-{
-    $data = $this->summary($user);
+    {
+        $data = $this->summary($user);
 
-    $pdf = PDF::loadView('reports.summary', compact('data'));
+        $pdf = PDF::loadView('reports.summary', compact('data'));
 
-    return $pdf->download('report.pdf');
-}
-public function exportExcel($user)
-{
-    return Excel::download(new AttendanceExport, 'attendance.xlsx');
-}
+        return $pdf->download('report.pdf');
+    }
+
+    public function exportExcel($user)
+    {
+        return Excel::download(new AttendanceExport, 'attendance.xlsx');
+    }
 }

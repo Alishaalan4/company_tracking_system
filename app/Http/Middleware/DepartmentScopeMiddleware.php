@@ -32,6 +32,6 @@ class DepartmentScopeMiddleware
             $request->merge(['department_scope_id' => $departmentId]);
             return $next($request);
         }
-        return response()->json(['message'=> 'Forbidden']);
+        return response()->json(['message'=> 'Forbidden'], 403);
     }
 }
