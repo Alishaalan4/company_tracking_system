@@ -6,6 +6,7 @@ use App\Models\LeaveRequest;
 use App\Models\Attendance;
 use App\Services\AuditLogService;
 use App\Services\NotificationService;
+use App\Http\Resources\LeaveRequestResource;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -101,13 +102,17 @@ class LeaveService
 
     public function index($user)
     {
-        if ($user->isAdmin()) {
-            return LeaveRequest::latest()->paginate(30);
+        $query = LeaveRequest::with(['user', 'leaveType'])->latest();
+
+        // Admins review everyone's requests; managers see their department;
+        // employees only their own.
+        if ($user->isManager()) {
+            $query->whereHas('user', fn ($q) => $q->where('department_id', $user->department_id));
+        } elseif (!$user->isAdmin()) {
+            $query->where('user_id', $user->id);
         }
 
-        return LeaveRequest::where('user_id', $user->id)
-            ->latest()
-            ->paginate(30);
+        return LeaveRequestResource::collection($query->paginate(30));
     }
 
     public function delete($id)

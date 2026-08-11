@@ -26,11 +26,19 @@ class UserController extends Controller
         // with the table's unique index on email.
         'email' => ['required', 'email', Rule::unique('users')->whereNull('deleted_at')],
         'role_id' => 'required|exists:roles,id',
-        'department_id' => 'nullable|exists:departments,id'
+        'department_id' => 'nullable|exists:departments,id',
+        'password' => 'nullable|string|min:6',
+        'pin' => 'nullable|string|min:4|max:6',
     ]);
 
-    $tempPassword = Str::random(8);
-    $tempPin = rand(1000, 9999);
+    // Honour credentials the admin typed; only generate when they left the
+    // fields blank. Previously these inputs were silently discarded and the
+    // account always got random credentials instead.
+    $chosenPassword = $request->filled('password');
+    $chosenPin = $request->filled('pin');
+
+    $tempPassword = $chosenPassword ? $request->password : Str::random(8);
+    $tempPin = $chosenPin ? $request->pin : (string) rand(1000, 9999);
 
     $attributes = [
         'name' => $request->name,
@@ -40,8 +48,9 @@ class UserController extends Controller
         'role_id' => $request->role_id,
         'department_id' => $request->department_id,
         'is_active' => true,
-        'must_change_pin' => true,
-        'must_change_password' => true,
+        // Only force a change for credentials the user has not chosen.
+        'must_change_password' => !$chosenPassword,
+        'must_change_pin' => !$chosenPin,
     ];
 
     $trashed = User::onlyTrashed()->where('email', $request->email)->first();
