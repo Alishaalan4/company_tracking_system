@@ -19,4 +19,9 @@ class AuditLog extends Model
     protected $casts = [
         'meta' => 'array',
     ];
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 }

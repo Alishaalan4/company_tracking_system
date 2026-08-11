@@ -17,8 +17,8 @@ class AttendanceService
 
         $today = Carbon::today();
 
-        // Skip non-working days
-        if (NonWorkingDay::where('date', $today)->exists()) {
+        // Skip non-working days (including entries that recur annually)
+        if (NonWorkingDay::fallsOn($today)) {
             return response()->json(['message' => 'Non-working day']);
         }
 
@@ -44,6 +44,17 @@ class AttendanceService
                 'date' => Carbon::today(),
             ]
         );
+    }
+
+    /**
+     * Read-only lookup. Check-out must not create a row: doing so left an empty
+     * attendance record behind whenever someone checked out without checking in.
+     */
+    private function findTodayAttendance($user)
+    {
+        return Attendance::where('user_id', $user->id)
+            ->whereDate('date', Carbon::today())
+            ->first();
     }
 
     public function checkIn($user, $pin)
@@ -90,9 +101,9 @@ class AttendanceService
             return response()->json(['message' => 'User is not assigned to a department'], 422);
         }
 
-        $attendance = $this->getTodayAttendance($user);
+        $attendance = $this->findTodayAttendance($user);
 
-        if (!$attendance->check_in_at) {
+        if (!$attendance || !$attendance->check_in_at) {
             return response()->json(['message' => 'No check-in found for today'], 422);
         }
 
@@ -131,8 +142,10 @@ class AttendanceService
 
     public function history($user)
     {
-        return Attendance::where('user_id', $user->id)
+        $history = Attendance::where('user_id', $user->id)
             ->latest('date')
             ->paginate(30);
+
+        return \App\Http\Resources\AttendanceResource::collection($history);
     }
 }

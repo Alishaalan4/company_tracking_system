@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
+use App\Services\AuditLogService;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\NewUserCredentialsMail;
@@ -45,6 +46,8 @@ class UserController extends Controller
             $tempPin
         ));
 
+    AuditLogService::record('user.created', "Created user {$user->email}", $user);
+
     return response()->json([
         'message' => 'User created and credentials sent by email'
     ]);
@@ -79,13 +82,26 @@ class UserController extends Controller
             unset($data['pin_confirmation']);
         }
 
+        $changed = array_keys(array_diff_key($data, array_flip(['password', 'pin'])));
+        if (isset($data['password'])) { $changed[] = 'password'; }
+        if (isset($data['pin'])) { $changed[] = 'pin'; }
+
         $user->update($data);
+
+        AuditLogService::record(
+            'user.updated',
+            "Updated user {$user->email}",
+            $user,
+            ['fields' => array_values(array_unique($changed))]
+        );
 
         return $user;
     }
 
     public function destroy(User $user)
     {
+        AuditLogService::record('user.deleted', "Deleted user {$user->email}", $user);
+
         $user->delete();
         return response()->json(['message' => 'Deleted']);
     }
@@ -109,6 +125,8 @@ class UserController extends Controller
             $tempPassword,
             $tempPin
         ));
+
+    AuditLogService::record('user.credentials_resent', "Reissued credentials for {$user->email}", $user);
 
     return response()->json([
         'message' => 'New credentials sent successfully'

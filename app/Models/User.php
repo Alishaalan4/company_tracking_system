@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -12,7 +13,9 @@ use Illuminate\Contracts\Auth\CanResetPassword as CanResetPasswordContract;
 
 class User extends Authenticatable implements CanResetPasswordContract
 {
-    use HasApiTokens, HasFactory, Notifiable, CanResetPassword;
+    // The users table has a deleted_at column, but without this trait
+    // "delete user" was a hard delete and the column went unused.
+    use HasApiTokens, HasFactory, Notifiable, CanResetPassword, SoftDeletes;
 
     /**
      * The attributes that are mass assignable.

@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Hash;
 use App\Models\User;
+use App\Services\AuditLogService;
 
 
 class AuthController extends Controller
@@ -54,6 +55,12 @@ class AuthController extends Controller
             || ($isPinLogin && Hash::check($request->pin, $user->pin));
 
         if (!$isValidCredentials) {
+            AuditLogService::record(
+                'login.failed',
+                "Failed login attempt for {$request->email}",
+                $user
+            );
+
             return response()->json(['message'=> 'Invalid Credentials'], 401);
         }
 
@@ -62,6 +69,13 @@ class AuthController extends Controller
         }
 
         $token = $user->createToken('api-token')->plainTextToken;
+
+        app(AuditLogService::class)->log(
+            $user->id,
+            'login',
+            $isPinLogin ? 'Signed in with PIN' : 'Signed in with password',
+            ['model' => 'User', 'model_id' => $user->id]
+        );
 
         // The SPA gates its whole admin UI on user.role.name, so the relations
         // must be eager-loaded here.
@@ -83,6 +97,8 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
+        AuditLogService::record('logout', 'Signed out', $request->user());
+
         $request->user()->currentAccessToken()->delete();
 
         return response()->json(['message' => 'Logged out']);
@@ -106,7 +122,13 @@ class AuthController extends Controller
             'must_change_password' => false,
         ]);
 
-        return response()->json(['message' => 'Password changed successfully']);
+        AuditLogService::record('password.changed', 'Password changed', $user);
+
+        // Return the user so the SPA can clear its "must change" gate.
+        return response()->json([
+            'message' => 'Password changed successfully',
+            'user' => $user->fresh()->load('role', 'department'),
+        ]);
     }
 
     public function changePin(Request $request)
@@ -127,6 +149,11 @@ class AuthController extends Controller
             'must_change_pin' => false,
         ]);
 
-        return response()->json(['message' => 'PIN changed successfully']);
+        AuditLogService::record('pin.changed', 'Attendance PIN changed', $user);
+
+        return response()->json([
+            'message' => 'PIN changed successfully',
+            'user' => $user->fresh()->load('role', 'department'),
+        ]);
     }
 }

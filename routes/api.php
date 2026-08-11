@@ -84,7 +84,7 @@ Route::middleware(['auth:sanctum'])->prefix('auth')->group(function () {
     |--------------------------------------------------------------------------
     */
 
-    Route::prefix('attendance')->middleware(['auth:sanctum','role:employee,manager,admin'])->group(function () {
+    Route::prefix('attendance')->middleware(['auth:sanctum','credentials.current','role:employee,manager,admin'])->group(function () {
 
         Route::post('/check-in',
             [AttendanceController::class, 'checkIn']
@@ -111,7 +111,7 @@ Route::middleware(['auth:sanctum'])->prefix('auth')->group(function () {
     |--------------------------------------------------------------------------
     */
 
-    Route::prefix('leaves')->middleware(['auth:sanctum','role:employee,manager,admin'])->group(function () {
+    Route::prefix('leaves')->middleware(['auth:sanctum','credentials.current','role:employee,manager,admin'])->group(function () {
 
         Route::post('/', [LeaveController::class, 'store']);
         Route::get('/', [LeaveController::class, 'index']);
@@ -126,7 +126,7 @@ Route::middleware(['auth:sanctum'])->prefix('auth')->group(function () {
     });
 
     // Backward-compatible alias for clients using /api/leave-requests
-    Route::prefix('leave-requests')->middleware(['auth:sanctum','role:employee,manager,admin'])->group(function () {
+    Route::prefix('leave-requests')->middleware(['auth:sanctum','credentials.current','role:employee,manager,admin'])->group(function () {
 
         Route::post('/', [LeaveController::class, 'store']);
         Route::get('/', [LeaveController::class, 'index']);
@@ -141,7 +141,7 @@ Route::middleware(['auth:sanctum'])->prefix('auth')->group(function () {
     });
 
     Route::get('/leave-types', [LeaveTypeController::class, 'index'])
-        ->middleware('auth:sanctum');
+        ->middleware(['auth:sanctum','credentials.current']);
 
     /*
     |--------------------------------------------------------------------------
@@ -149,10 +149,12 @@ Route::middleware(['auth:sanctum'])->prefix('auth')->group(function () {
     |--------------------------------------------------------------------------
     */
 
-    Route::prefix('notifications')->middleware('auth:sanctum')->group(function () {
+    Route::prefix('notifications')->middleware(['auth:sanctum','credentials.current'])->group(function () {
 
         Route::get('/', fn(Request $r) =>
-            $r->user()->notifications()->latest()->get()
+            \App\Http\Resources\NotificationResource::collection(
+                $r->user()->notifications()->latest()->get()
+            )
         );
 
         Route::post('/{id}/read', function ($id, Request $r) {
@@ -173,7 +175,7 @@ Route::middleware(['auth:sanctum'])->prefix('auth')->group(function () {
     */
 
     Route::prefix('reports')
-        ->middleware(['auth:sanctum','role:admin,manager','department.scope'])
+        ->middleware(['auth:sanctum','credentials.current','role:admin,manager','department.scope'])
         ->group(function () {
 
         Route::get('/daily', [ReportController::class, 'daily']);
@@ -190,7 +192,7 @@ Route::middleware(['auth:sanctum'])->prefix('auth')->group(function () {
     |--------------------------------------------------------------------------
     */
 
-    Route::middleware(['auth:sanctum','role:admin'])->group(function () {
+    Route::middleware(['auth:sanctum','credentials.current','role:admin'])->group(function () {
 
         Route::apiResource('departments', DepartmentController::class);
         Route::apiResource('leave-types', LeaveTypeController::class)->except(['index']);
@@ -199,7 +201,7 @@ Route::middleware(['auth:sanctum'])->prefix('auth')->group(function () {
 
         Route::get('/audit-logs', [AuditController::class, 'index']);
 
-        Route::get('/settings', fn() => \App\Models\Setting::all());
+        Route::get('/settings', [SettingController::class, 'index']);
         Route::post('/settings', [SettingController::class, 'update']);
 
         Route::post('/register', [AuthController::class, 'register']);

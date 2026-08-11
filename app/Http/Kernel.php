@@ -67,5 +67,6 @@ class Kernel extends HttpKernel
         'role' => \App\Http\Middleware\RoleMiddleware::class,
         'department.scope' => \App\Http\Middleware\DepartmentScopeMiddleware::class,
         'attendance.guard' => \App\Http\Middleware\AttendanceGuardMiddleware::class,
+        'credentials.current' => \App\Http\Middleware\EnsureCredentialsAreCurrent::class,
     ];
 }
