@@ -57,10 +57,16 @@ class AuthController extends Controller
             return response()->json(['message'=> 'Invalid Credentials'], 401);
         }
 
+        if (!$user->is_active) {
+            return response()->json(['message' => 'This account has been deactivated'], 403);
+        }
+
         $token = $user->createToken('api-token')->plainTextToken;
 
+        // The SPA gates its whole admin UI on user.role.name, so the relations
+        // must be eager-loaded here.
         return response()->json([
-            'user' => $user,
+            'user' => $user->load('role', 'department'),
             'token' => $token
         ]);
     }

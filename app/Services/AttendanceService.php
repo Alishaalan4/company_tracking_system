@@ -119,7 +119,7 @@ class AttendanceService
     {
         $date = Carbon::today();
         $attendance = Attendance::where('user_id', $user->id)
-            ->whereDate($date)
+            ->whereDate('date', $date)
             ->first();
 
         if (!$attendance || !$attendance->check_in_at) {

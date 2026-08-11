@@ -21,7 +21,11 @@ class ReportController extends Controller
 
     public function monthly(Request $request)
     {
-        return $this->reportService->monthly($request->user(), $request->month);
+        return $this->reportService->monthly(
+            $request->user(),
+            $request->query('month'),
+            $request->query('year')
+        );
     }
 
     public function summary(Request $request)

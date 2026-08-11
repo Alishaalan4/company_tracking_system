@@ -11,9 +11,9 @@ class ReportService
 {
     public function daily($user, $date)
     {
-        $date = Carbon::parse($date)->toDateString();
+        $date = $date ? Carbon::parse($date)->toDateString() : Carbon::today()->toDateString();
 
-        $query = Attendance::whereDate( $date);
+        $query = Attendance::whereDate('date', $date);
 
         if ($user->isManager()) {
             $query->whereHas('user', function ($q) use ($user) {
@@ -24,12 +24,14 @@ class ReportService
         return $query->with('user')->get();
     }
 
-    public function monthly($user, $month)
+    public function monthly($user, $month = null, $year = null)
     {
-        $month = Carbon::parse($month);
+        $today = Carbon::today();
+        $month = (int) ($month ?: $today->month);
+        $year = (int) ($year ?: $today->year);
 
-        $query = Attendance::whereMonth('date', $month->month)
-            ->whereYear('date', $month->year);
+        $query = Attendance::whereMonth('date', $month)
+            ->whereYear('date', $year);
 
         if ($user->isManager()) {
             $query->whereHas('user', function ($q) use ($user) {

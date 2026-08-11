@@ -76,17 +76,27 @@ class User extends Authenticatable implements CanResetPasswordContract
         return $this->hasMany(Notification::class);
     }
 
-    public function isAdmin()    
+    /**
+     * Role names are compared case-insensitively. Existing rows are stored
+     * capitalised ("Admin"), while the seeder and the SPA use lowercase;
+     * a strict === here silently made every role check return false.
+     */
+    public function hasRole(string $role): bool
     {
-        return $this->role->name === 'admin'; 
+        return strcasecmp((string) optional($this->role)->name, $role) === 0;
     }
-    public function isManager()  
-    { 
-        return $this->role->name === 'manager'; 
+
+    public function isAdmin()
+    {
+        return $this->hasRole('admin');
     }
-    public function isEmployee() 
-    { 
-        return $this->role->name === 'employee';
+    public function isManager()
+    {
+        return $this->hasRole('manager');
+    }
+    public function isEmployee()
+    {
+        return $this->hasRole('employee');
     }
 
 }
