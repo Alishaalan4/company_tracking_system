@@ -35,11 +35,24 @@ class ReportController extends Controller
 
     public function exportPdf(Request $request)
     {
-        return $this->reportService->exportPdf($request->user());
+        return $this->reportService->exportPdf($request->user(), $this->filters($request));
     }
 
     public function exportExcel(Request $request)
     {
-        return $this->reportService->exportExcel($request->user());
+        return $this->reportService->exportExcel($request->user(), $this->filters($request));
+    }
+
+    /**
+     * Export filters mirror the report tabs: a date gives the daily report,
+     * month/year the monthly one, and neither falls back to the summary.
+     */
+    private function filters(Request $request): array
+    {
+        return array_filter([
+            'date' => $request->query('date'),
+            'month' => $request->query('month'),
+            'year' => $request->query('year'),
+        ], fn ($value) => $value !== null && $value !== '');
     }
 }

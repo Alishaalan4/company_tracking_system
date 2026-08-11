@@ -152,17 +152,90 @@ class ReportService
         ];
     }
 
-    public function exportPdf($user)
+    /**
+     * Builds the rows for an export from the same filters the report tabs use,
+     * so a PDF/Excel download matches whatever is on screen. Previously both
+     * exports ignored their parameters and always dumped the all-time summary.
+     */
+    public function exportPayload($user, array $filters = []): array
     {
-        $data = $this->summary($user);
+        $date = $filters['date'] ?? null;
+        $month = $filters['month'] ?? null;
+        $year = $filters['year'] ?? null;
 
-        $pdf = PDF::loadView('reports.summary', compact('data'));
+        $time = fn ($iso) => $iso ? Carbon::parse($iso)->format('H:i') : '—';
 
-        return $pdf->download('report.pdf');
+        if ($date) {
+            $report = $this->daily($user, $date);
+
+            return [
+                'title' => 'Daily Attendance — ' . $report['date'],
+                'filename' => 'attendance-daily-' . $report['date'],
+                'headings' => ['Employee', 'Department', 'Check In', 'Check Out', 'Duration', 'Status'],
+                'rows' => collect($report['records'])->map(fn ($r) => [
+                    $r['user_name'] ?? '—',
+                    $r['department'] ?? '—',
+                    $time($r['check_in']),
+                    $time($r['check_out']),
+                    $r['duration'] !== null ? intdiv($r['duration'], 60) . 'h ' . ($r['duration'] % 60) . 'm' : '—',
+                    ucfirst($r['status']),
+                ])->values()->all(),
+            ];
+        }
+
+        if ($month || $year) {
+            $report = $this->monthly($user, $month, $year);
+            $label = Carbon::create($report['year'], $report['month'], 1)->format('F Y');
+
+            return [
+                'title' => 'Monthly Attendance — ' . $label,
+                'filename' => 'attendance-monthly-' . $report['year'] . '-' . str_pad((string) $report['month'], 2, '0', STR_PAD_LEFT),
+                'headings' => ['Employee', 'Total Days', 'Present', 'Absent', 'On Leave', 'Late'],
+                'rows' => collect($report['records'])->map(fn ($r) => [
+                    $r['user_name'] ?? '—',
+                    $r['total_days'],
+                    $r['present_days'],
+                    $r['absent_days'],
+                    $r['leave_days'],
+                    $r['late_days'],
+                ])->values()->all(),
+            ];
+        }
+
+        $summary = $this->summary($user);
+
+        return [
+            'title' => 'Attendance Summary',
+            'filename' => 'attendance-summary',
+            'headings' => ['Metric', 'Count'],
+            'rows' => [
+                ['Total Employees', $summary['total_employees']],
+                ['Present Today', $summary['present_today']],
+                ['On Leave Today', $summary['on_leave_today']],
+                ['Absent Today', $summary['absent_today']],
+                ['Total Late (all time)', $summary['total_late']],
+                ['Total Absent (all time)', $summary['total_absent']],
+                ['Total Early Leave (all time)', $summary['total_early']],
+            ],
+        ];
     }
 
-    public function exportExcel($user)
+    public function exportPdf($user, array $filters = [])
     {
-        return Excel::download(new AttendanceExport, 'attendance.xlsx');
+        $payload = $this->exportPayload($user, $filters);
+
+        $pdf = PDF::loadView('reports.export', $payload);
+
+        return $pdf->download($payload['filename'] . '.pdf');
+    }
+
+    public function exportExcel($user, array $filters = [])
+    {
+        $payload = $this->exportPayload($user, $filters);
+
+        return Excel::download(
+            new AttendanceExport($payload['headings'], $payload['rows']),
+            $payload['filename'] . '.xlsx'
+        );
     }
 }

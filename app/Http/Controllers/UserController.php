@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\NewUserCredentialsMail;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 class UserController extends Controller
 {
     public function index()
@@ -20,7 +21,10 @@ class UserController extends Controller
 {
     $request->validate([
         'name' => 'required',
-        'email' => 'required|email|unique:users',
+        // Ignore soft-deleted rows so a removed employee's address can be
+        // reused; the trashed record is restored below instead of colliding
+        // with the table's unique index on email.
+        'email' => ['required', 'email', Rule::unique('users')->whereNull('deleted_at')],
         'role_id' => 'required|exists:roles,id',
         'department_id' => 'nullable|exists:departments,id'
     ]);
@@ -28,30 +32,59 @@ class UserController extends Controller
     $tempPassword = Str::random(8);
     $tempPin = rand(1000, 9999);
 
-    $user = User::create([
+    $attributes = [
         'name' => $request->name,
         'email' => $request->email,
         'password' => Hash::make($tempPassword),
         'pin' => Hash::make($tempPin),
         'role_id' => $request->role_id,
         'department_id' => $request->department_id,
+        'is_active' => true,
         'must_change_pin' => true,
         'must_change_password' => true,
-    ]);
+    ];
 
-    Mail::to($user->email)
-        ->queue(new NewUserCredentialsMail(
-            $user,
-            $tempPassword,
-            $tempPin
-        ));
+    $trashed = User::onlyTrashed()->where('email', $request->email)->first();
 
-    AuditLogService::record('user.created', "Created user {$user->email}", $user);
+    if ($trashed) {
+        $trashed->restore();
+        $trashed->update($attributes);
+        $user = $trashed;
+        $action = 'user.restored';
+    } else {
+        $user = User::create($attributes);
+        $action = 'user.created';
+    }
+
+    $delivered = $this->sendCredentials($user, $tempPassword, $tempPin);
+
+    AuditLogService::record($action, "Created user {$user->email}", $user);
 
     return response()->json([
-        'message' => 'User created and credentials sent by email'
-    ]);
+        'message' => $delivered
+            ? 'User created and credentials sent by email'
+            : 'User created, but the credentials email could not be sent. Use "Resend credentials" to try again.',
+        'email_sent' => $delivered,
+    ], 201);
 }
+
+    /**
+     * Sent synchronously: the queue connection is `database` with no worker
+     * running, so queued credential emails were never actually delivered.
+     * A mail failure must not discard the user that was just created.
+     */
+    private function sendCredentials(User $user, string $password, $pin): bool
+    {
+        try {
+            Mail::to($user->email)->send(new NewUserCredentialsMail($user, $password, $pin));
+
+            return true;
+        } catch (\Throwable $e) {
+            report($e);
+
+            return false;
+        }
+    }
 
     public function show(User $user)
     {
@@ -62,7 +95,10 @@ class UserController extends Controller
     {
         $data = $request->validate([
             'name' => 'sometimes|required|string|max:255',
-            'email' => 'sometimes|required|email|unique:users,email,' . $user->id,
+            'email' => [
+                'sometimes', 'required', 'email',
+                Rule::unique('users')->ignore($user->id)->whereNull('deleted_at'),
+            ],
             'role_id' => 'sometimes|required|exists:roles,id',
             'department_id' => 'nullable|exists:departments,id',
             'password' => 'sometimes|required|string|min:6|confirmed',
@@ -119,17 +155,15 @@ class UserController extends Controller
         'must_change_pin' => true,
     ]);
 
-    Mail::to($user->email)
-        ->queue(new NewUserCredentialsMail(
-            $user,
-            $tempPassword,
-            $tempPin
-        ));
+    $delivered = $this->sendCredentials($user, $tempPassword, $tempPin);
 
     AuditLogService::record('user.credentials_resent', "Reissued credentials for {$user->email}", $user);
 
     return response()->json([
-        'message' => 'New credentials sent successfully'
-    ]);
+        'message' => $delivered
+            ? 'New credentials sent successfully'
+            : 'Credentials were reset, but the email could not be sent.',
+        'email_sent' => $delivered,
+    ], $delivered ? 200 : 502);
 }
 }
