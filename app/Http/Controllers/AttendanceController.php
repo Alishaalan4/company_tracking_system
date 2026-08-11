@@ -54,4 +54,24 @@ class AttendanceController extends Controller
     {
         return $this->attendanceService->history($request->user());
     }
+
+    public function status(Request $request)
+    {
+        $date = \Carbon\Carbon::today();
+        $attendance = \App\Models\Attendance::where('user_id', $request->user()->id)
+            ->whereDate('date', $date)
+            ->first();
+
+        if (!$attendance) {
+            return response()->json([
+                'is_checked_in' => false,
+            ]);
+        }
+        
+        return response()->json([
+            'is_checked_in' => $attendance->check_in_at && !$attendance->check_out_at,
+            'check_in_time' => $attendance->check_in_at,
+            'check_out_time' => $attendance->check_out_at
+        ]);
+    }
 }

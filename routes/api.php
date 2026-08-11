@@ -98,6 +98,9 @@ Route::middleware(['auth:sanctum'])->prefix('auth')->group(function () {
             [AttendanceController::class, 'check']
         )->middleware(['throttle:attendance','attendance.guard']);
 
+        Route::get('/status',
+            [AttendanceController::class, 'status']);
+
         Route::get('/history',
             [AttendanceController::class, 'history']);
     });
@@ -136,6 +139,9 @@ Route::middleware(['auth:sanctum'])->prefix('auth')->group(function () {
             [LeaveController::class, 'destroy']
         )->middleware('role:admin');
     });
+
+    Route::get('/leave-types', [LeaveTypeController::class, 'index'])
+        ->middleware('auth:sanctum');
 
     /*
     |--------------------------------------------------------------------------
@@ -187,7 +193,7 @@ Route::middleware(['auth:sanctum'])->prefix('auth')->group(function () {
     Route::middleware(['auth:sanctum','role:admin'])->group(function () {
 
         Route::apiResource('departments', DepartmentController::class);
-        Route::apiResource('leave-types', LeaveTypeController::class);
+        Route::apiResource('leave-types', LeaveTypeController::class)->except(['index']);
         Route::apiResource('non-working-days', NonWorkingDayController::class);
         Route::apiResource('users', UserController::class);
 
